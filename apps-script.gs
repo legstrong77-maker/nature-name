@@ -26,9 +26,9 @@
 const SHEET_NAME = 'NatureNames';
 const COLS = 5; // groupId, groupName, name, addedAt, passwordHash
 
-// 超級使用者：SHA-256('770525')。可繞過任何團體密碼，可清空整份資料。
+// 超級使用者：SHA-256('泥鰍')。可繞過任何團體密碼，可清空整份資料。
 // 修改此密碼：到 https://emn178.github.io/online-tools/sha256.html 算新雜湊後替換下面這串。
-const SUPER_HASH = '3a27555e086e22bfd9ab0453e509020fccbd7d0df2e74bd0ad9bc0be2fb32c4d';
+const SUPER_HASH = '7846d02b38c2a745a3d9bc7e24276224cda06b20cd0f6c09bc7c05768f95e9a9';
 
 function _sheet() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();

@@ -710,8 +710,8 @@ function showModal({ title, desc, fields, submitLabel, validate }) {
 }
 
 //=============== 超級使用者 ===============
-// SHA-256('770525')。任何輸入若雜湊出此值即取得最高權限。
-const SUPER_HASH = '3a27555e086e22bfd9ab0453e509020fccbd7d0df2e74bd0ad9bc0be2fb32c4d';
+// SHA-256('泥鰍')。任何輸入若雜湊出此值即取得最高權限。
+const SUPER_HASH = '7846d02b38c2a745a3d9bc7e24276224cda06b20cd0f6c09bc7c05768f95e9a9';
 const SUPER_KEY = 'nature-names-super';
 function isSuper() { return sessionStorage.getItem(SUPER_KEY) === SUPER_HASH; }
 function setSuper(on) {
