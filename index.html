@@ -1,0 +1,1683 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>荒野親子團 自然名查詢系統</title>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<style>
+  :root {
+    --bg: #f4f7f3;
+    --card: #ffffff;
+    --primary: #3a7d44;
+    --primary-dark: #2d5f35;
+    --accent: #d2a106;
+    --danger: #c0392b;
+    --text: #2c3a2e;
+    --muted: #6b7a6e;
+    --border: #d8e1d6;
+    --hover: #eef3ec;
+    --warn-bg: #fff4d6;
+    --warn-border: #e0b94e;
+    --ok-bg: #e6f3e8;
+    --ok-border: #7fb886;
+  }
+  * { box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "PingFang TC", "Microsoft JhengHei", "Segoe UI", sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    margin: 0;
+    line-height: 1.6;
+  }
+  header {
+    background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+    color: white;
+    padding: 18px 24px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+  }
+  header h1 {
+    margin: 0;
+    font-size: 1.4rem;
+    font-weight: 600;
+  }
+  header .subtitle {
+    font-size: 0.85rem;
+    opacity: 0.85;
+    margin-top: 4px;
+  }
+  .container {
+    max-width: 1000px;
+    margin: 0 auto;
+    padding: 20px;
+  }
+  .group-bar {
+    background: var(--card);
+    border-radius: 12px;
+    padding: 14px 18px;
+    margin-bottom: 18px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+  }
+  .group-bar label {
+    font-weight: 600;
+    color: var(--muted);
+    font-size: 0.9rem;
+  }
+  .group-bar select, .group-bar input {
+    padding: 6px 10px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    font-size: 0.95rem;
+    background: white;
+  }
+  .group-bar .stat {
+    margin-left: auto;
+    color: var(--muted);
+    font-size: 0.9rem;
+  }
+  .tabs {
+    display: flex;
+    gap: 4px;
+    margin-bottom: 18px;
+    border-bottom: 2px solid var(--border);
+  }
+  .tab {
+    padding: 10px 20px;
+    cursor: pointer;
+    font-size: 1rem;
+    background: transparent;
+    border: none;
+    border-bottom: 3px solid transparent;
+    margin-bottom: -2px;
+    color: var(--muted);
+    font-weight: 500;
+    transition: all 0.15s;
+  }
+  .tab:hover { color: var(--primary); }
+  .tab.active {
+    color: var(--primary);
+    border-bottom-color: var(--primary);
+    font-weight: 600;
+  }
+  .panel { display: none; }
+  .panel.active { display: block; }
+  .card {
+    background: var(--card);
+    border-radius: 12px;
+    padding: 22px;
+    margin-bottom: 18px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+  }
+  .card h2 {
+    margin: 0 0 14px;
+    font-size: 1.15rem;
+    color: var(--primary-dark);
+  }
+  .search-box {
+    width: 100%;
+    padding: 14px 18px;
+    font-size: 1.2rem;
+    border: 2px solid var(--border);
+    border-radius: 10px;
+    transition: border-color 0.15s;
+  }
+  .search-box:focus {
+    outline: none;
+    border-color: var(--primary);
+  }
+  .result-block {
+    margin-top: 16px;
+    padding: 16px;
+    border-radius: 10px;
+    border: 1px solid;
+  }
+  .result-block.exact {
+    background: #fdecea;
+    border-color: var(--danger);
+  }
+  .result-block.partial {
+    background: var(--warn-bg);
+    border-color: var(--warn-border);
+  }
+  .result-block.clear {
+    background: var(--ok-bg);
+    border-color: var(--ok-border);
+  }
+  .result-block h3 {
+    margin: 0 0 8px;
+    font-size: 1rem;
+  }
+  .result-block.exact h3 { color: var(--danger); }
+  .result-block.partial h3 { color: #8a6d1a; }
+  .result-block.clear h3 { color: var(--primary-dark); }
+  .name-chip {
+    display: inline-block;
+    padding: 4px 12px;
+    margin: 3px;
+    background: white;
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    font-size: 0.95rem;
+  }
+  .name-chip mark {
+    background: #ffeaa7;
+    padding: 0 2px;
+    border-radius: 3px;
+  }
+  .all-names-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+    gap: 6px;
+    margin-top: 12px;
+  }
+  .all-names-grid .name-chip {
+    text-align: center;
+    margin: 0;
+  }
+  .stroke-group {
+    margin-bottom: 18px;
+  }
+  .stroke-header {
+    font-size: 0.85rem;
+    color: var(--muted);
+    border-bottom: 1px dashed var(--border);
+    padding-bottom: 4px;
+    margin-bottom: 8px;
+    font-weight: 600;
+  }
+  textarea {
+    width: 100%;
+    min-height: 120px;
+    padding: 10px 12px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    font-family: inherit;
+    font-size: 0.95rem;
+    resize: vertical;
+  }
+  textarea:focus { outline: none; border-color: var(--primary); }
+  .btn {
+    padding: 9px 18px;
+    border: none;
+    border-radius: 8px;
+    font-size: 0.95rem;
+    cursor: pointer;
+    font-weight: 500;
+    transition: all 0.15s;
+  }
+  .btn-primary {
+    background: var(--primary);
+    color: white;
+  }
+  .btn-primary:hover { background: var(--primary-dark); }
+  .btn-secondary {
+    background: white;
+    color: var(--text);
+    border: 1px solid var(--border);
+  }
+  .btn-secondary:hover { background: var(--hover); }
+  .btn-danger {
+    background: white;
+    color: var(--danger);
+    border: 1px solid var(--danger);
+  }
+  .btn-danger:hover { background: var(--danger); color: white; }
+  .btn-row {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin-top: 12px;
+  }
+  .file-drop {
+    border: 2px dashed var(--border);
+    border-radius: 10px;
+    padding: 28px;
+    text-align: center;
+    color: var(--muted);
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .file-drop:hover, .file-drop.dragover {
+    border-color: var(--primary);
+    background: var(--hover);
+    color: var(--primary);
+  }
+  .file-drop input { display: none; }
+  .hint {
+    font-size: 0.85rem;
+    color: var(--muted);
+    margin-top: 6px;
+  }
+  .radio-row {
+    display: flex;
+    gap: 18px;
+    margin: 10px 0;
+    font-size: 0.95rem;
+  }
+  .radio-row label { cursor: pointer; }
+  .toast {
+    position: fixed;
+    bottom: 24px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: #2c3a2e;
+    color: white;
+    padding: 12px 24px;
+    border-radius: 24px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+    opacity: 0;
+    transition: opacity 0.2s;
+    pointer-events: none;
+    z-index: 1000;
+  }
+  .toast.show { opacity: 1; }
+  .empty-state {
+    text-align: center;
+    padding: 40px 20px;
+    color: var(--muted);
+  }
+  .empty-state .icon {
+    font-size: 3rem;
+    margin-bottom: 8px;
+  }
+  .share-link {
+    background: #f0f5ee;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 8px 12px;
+    font-family: monospace;
+    font-size: 0.85rem;
+    word-break: break-all;
+    margin-top: 8px;
+  }
+  .preview-list {
+    max-height: 200px;
+    overflow-y: auto;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 10px;
+    background: #fafbfa;
+    margin-top: 10px;
+    font-size: 0.9rem;
+  }
+  .filter-box {
+    width: 100%;
+    padding: 9px 12px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    font-size: 0.95rem;
+    margin-bottom: 12px;
+  }
+  .filter-box:focus { outline: none; border-color: var(--primary); }
+  .editable-chip {
+    display: inline-flex;
+    align-items: center;
+    padding: 4px 6px 4px 12px;
+    margin: 3px;
+    background: white;
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    font-size: 0.95rem;
+    gap: 6px;
+  }
+  .editable-chip.dup {
+    background: #fdecea;
+    border-color: var(--danger);
+  }
+  .editable-chip .del-btn {
+    background: transparent;
+    border: none;
+    color: var(--muted);
+    cursor: pointer;
+    font-size: 1rem;
+    line-height: 1;
+    padding: 2px 6px;
+    border-radius: 50%;
+    transition: all 0.15s;
+  }
+  .editable-chip .del-btn:hover {
+    background: var(--danger);
+    color: white;
+  }
+  .dup-banner {
+    background: #fdecea;
+    border: 1px solid var(--danger);
+    color: var(--danger);
+    padding: 8px 12px;
+    border-radius: 8px;
+    margin-bottom: 12px;
+    font-size: 0.9rem;
+  }
+  /* Modal */
+  .modal-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(20, 30, 24, 0.55);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 2000;
+    padding: 20px;
+    backdrop-filter: blur(2px);
+  }
+  .modal-backdrop.hidden { display: none; }
+  .modal {
+    background: white;
+    border-radius: 14px;
+    padding: 24px;
+    width: 100%;
+    max-width: 420px;
+    box-shadow: 0 12px 40px rgba(0,0,0,0.25);
+  }
+  .modal h3 {
+    margin: 0 0 8px;
+    font-size: 1.15rem;
+    color: var(--primary-dark);
+  }
+  .modal .modal-desc {
+    color: var(--muted);
+    font-size: 0.9rem;
+    margin-bottom: 14px;
+    line-height: 1.5;
+  }
+  .modal .modal-field {
+    margin-bottom: 12px;
+  }
+  .modal .modal-field label {
+    display: block;
+    font-size: 0.88rem;
+    color: var(--muted);
+    margin-bottom: 4px;
+    font-weight: 500;
+  }
+  .modal .modal-field input {
+    width: 100%;
+    padding: 9px 12px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    font-size: 0.95rem;
+    font-family: inherit;
+  }
+  .modal .modal-field input:focus {
+    outline: none;
+    border-color: var(--primary);
+  }
+  .modal .modal-field .field-hint {
+    font-size: 0.8rem;
+    color: var(--muted);
+    margin-top: 3px;
+  }
+  .modal .modal-error {
+    color: var(--danger);
+    font-size: 0.85rem;
+    margin-bottom: 10px;
+    min-height: 1.1em;
+  }
+  .modal .modal-buttons {
+    display: flex;
+    gap: 8px;
+    justify-content: flex-end;
+    margin-top: 16px;
+  }
+  .lock-icon {
+    display: inline-block;
+    margin-right: 4px;
+  }
+  /* 雲端同步 */
+  .sync-badge {
+    font-size: 0.78rem;
+    padding: 3px 10px;
+    border-radius: 12px;
+    background: rgba(255,255,255,0.18);
+    color: white;
+    margin-left: 10px;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    cursor: help;
+  }
+  .sync-badge.local { background: rgba(255,255,255,0.18); }
+  .sync-badge.syncing { background: #d2a106; color: #fff; }
+  .sync-badge.synced { background: #4ea355; color: #fff; }
+  .sync-badge.error { background: #c0392b; color: #fff; }
+  .cloud-card {
+    background: linear-gradient(135deg, #f0f7fb, #e6f0fa);
+    border: 1px solid #b6d2eb;
+  }
+  .cloud-card h2 { color: #2a4d8d; }
+  .cloud-status {
+    padding: 8px 12px;
+    border-radius: 8px;
+    margin: 8px 0 12px;
+    font-size: 0.9rem;
+  }
+  .cloud-status.connected { background: #e6f3e8; color: #2d5f35; border: 1px solid #7fb886; }
+  .cloud-status.disconnected { background: #fef0e6; color: #8a4a14; border: 1px solid #e0a874; }
+  .cloud-input {
+    width: 100%;
+    padding: 9px 12px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    font-size: 0.9rem;
+    font-family: monospace;
+    margin-bottom: 8px;
+  }
+  /* 分類區塊 */
+  .cat-section { margin-bottom: 22px; }
+  .cat-section:last-child { margin-bottom: 0; }
+  .cat-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 1rem;
+    font-weight: 600;
+    padding: 6px 0 8px;
+    margin-bottom: 10px;
+    border-bottom: 2px solid var(--border);
+  }
+  .cat-header .cat-count {
+    margin-left: auto;
+    font-size: 0.85rem;
+    font-weight: 500;
+    color: var(--muted);
+  }
+  .cat-icon {
+    font-size: 1.15rem;
+  }
+  .cat-plant   .cat-header { border-color: #7fb886; color: #2d5f35; }
+  .cat-animal  .cat-header { border-color: #e08e45; color: #8a4a14; }
+  .cat-mineral .cat-header { border-color: #5b8def; color: #2a4d8d; }
+  .cat-other   .cat-header { border-color: #999;     color: #555; }
+  @media (max-width: 600px) {
+    header h1 { font-size: 1.15rem; }
+    .container { padding: 12px; }
+    .card { padding: 16px; }
+    .tab { padding: 8px 12px; font-size: 0.9rem; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>🌿 荒野親子團 自然名查詢系統 <span class="sync-badge local" id="syncBadge" title="目前模式">📱 本機模式</span></h1>
+  <div class="subtitle">為各團管理自然名清單，避免命名重複</div>
+</header>
+
+<div class="container">
+
+  <div class="group-bar">
+    <label>目前團體：</label>
+    <select id="groupSelect"></select>
+    <button class="btn btn-secondary" id="newGroupBtn">＋ 新增團體</button>
+    <button class="btn btn-secondary" id="lockBtn" title="解鎖 / 鎖定 / 設密碼">🔒 鎖定中</button>
+    <button class="btn btn-secondary" id="renameGroupBtn">重新命名</button>
+    <button class="btn btn-secondary" id="shareBtn">🔗 分享連結</button>
+    <span class="stat" id="countStat">共 0 個自然名</span>
+  </div>
+
+  <div class="tabs">
+    <button class="tab active" data-tab="search">🔍 查詢</button>
+    <button class="tab" data-tab="all">📋 全部名單</button>
+    <button class="tab" data-tab="admin">⚙️ 管理</button>
+  </div>
+
+  <!-- 查詢 -->
+  <div class="panel active" id="panel-search">
+    <div class="card">
+      <h2>查詢自然名是否已被使用</h2>
+      <input type="text" class="search-box" id="searchInput" placeholder="輸入想取的自然名，例如：海豚">
+      <div class="hint">提示：會同時找出包含相同字詞的名字（例如查「海豚」也會列出「小海豚」）</div>
+      <div id="searchResults"></div>
+    </div>
+  </div>
+
+  <!-- 全部名單 -->
+  <div class="panel" id="panel-all">
+    <div class="card">
+      <h2>全部自然名（依分類 + 首字筆畫排序）</h2>
+      <div id="allNamesContainer"></div>
+    </div>
+  </div>
+
+  <!-- 管理 -->
+  <div class="panel" id="panel-admin">
+    <div class="card cloud-card">
+      <h2>☁️ 雲端同步設定（Google Sheet）</h2>
+      <div id="cloudStatus" class="cloud-status disconnected">📱 目前是本機模式：資料只存在這台裝置的瀏覽器，其他人看不到。</div>
+      <div class="hint" style="margin-bottom:8px;">設定後，所有團員打開網站都能看到同一份名單。詳細部署步驟請見 <code>apps-script.gs</code> 檔案最上方說明。</div>
+      <input type="text" class="cloud-input" id="cloudUrl" placeholder="貼上 Google Apps Script 部署網址（https://script.google.com/macros/s/.../exec）">
+      <div class="btn-row">
+        <button class="btn btn-primary" id="cloudConnectBtn">連線並同步</button>
+        <button class="btn btn-secondary" id="cloudReloadBtn">🔄 重新拉取資料</button>
+        <button class="btn btn-secondary" id="cloudShareBtn">📋 複製連線網址</button>
+        <button class="btn btn-danger" id="cloudDisconnectBtn">中斷連線（改回本機）</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>📥 匯入 Excel / CSV</h2>
+      <div class="file-drop" id="fileDrop">
+        <div style="font-size:2rem;">📄</div>
+        <div>點此選擇檔案，或拖曳 Excel / CSV 進來</div>
+        <div class="hint">支援 .xlsx / .xls / .csv，會自動讀取每一欄的文字</div>
+        <input type="file" id="fileInput" accept=".xlsx,.xls,.csv">
+      </div>
+      <div id="filePreview"></div>
+    </div>
+
+    <div class="card">
+      <h2>📋 貼上或手動輸入</h2>
+      <div class="hint">每行一個名字，或用逗號 / 空白分隔。從 Excel 直接複製整欄貼上也 OK。</div>
+      <textarea id="pasteArea" placeholder="海豚&#10;小山貓&#10;月光&#10;小海豚, 大海, 風"></textarea>
+      <div class="radio-row">
+        <label><input type="radio" name="importMode" value="append" checked> 附加（保留原有名單）</label>
+        <label><input type="radio" name="importMode" value="replace"> 取代（清空後匯入）</label>
+      </div>
+      <div class="btn-row">
+        <button class="btn btn-primary" id="addPasteBtn">加入名單</button>
+        <button class="btn btn-secondary" id="clearPasteBtn">清空輸入框</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>📝 編輯名單（點 ✕ 刪除）</h2>
+      <input type="text" class="filter-box" id="adminFilter" placeholder="🔍 在名單中搜尋（可快速找到要刪除的名字）">
+      <div id="adminNamesContainer"></div>
+    </div>
+
+    <div class="card">
+      <h2>🛠️ 名單維護</h2>
+      <div class="btn-row">
+        <button class="btn btn-secondary" id="exportBtn">📤 匯出 Excel</button>
+        <button class="btn btn-secondary" id="exportCsvBtn">匯出 CSV</button>
+        <button class="btn btn-danger" id="clearAllBtn">🗑️ 清空目前團體名單</button>
+        <button class="btn btn-danger" id="deleteGroupBtn">刪除此團體</button>
+      </div>
+      <div class="hint" style="margin-top:14px;">資料儲存在你瀏覽器的 localStorage，不會上傳到任何伺服器。建議定期匯出備份。</div>
+    </div>
+
+    <div class="card" id="superCard" style="background:linear-gradient(135deg,#fff8e1,#fef0d4);border:1px solid #e0b94e;">
+      <h2 style="color:#8a6d1a;">👑 超級使用者</h2>
+      <div id="superLoggedOut">
+        <div class="hint" style="margin-bottom:10px;">超級使用者可繞過所有團體密碼、修改任何資料、清空整份資料。</div>
+        <button class="btn btn-secondary" id="superLoginBtn">👑 登入超級使用者</button>
+      </div>
+      <div id="superLoggedIn" style="display:none;">
+        <div class="cloud-status connected" style="margin-bottom:10px;">👑 <strong>已以超級使用者身分登入</strong>，所有團體皆可編輯。</div>
+        <div class="btn-row">
+          <button class="btn btn-secondary" id="superLogoutBtn">退出超級模式</button>
+          <button class="btn btn-danger" id="superResetPwBtn">🔑 強制重設某團密碼</button>
+          <button class="btn btn-danger" id="superWipeBtn">🚨 刪除所有資料（雲端 + 本機）</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<div class="toast" id="toast"></div>
+
+<div class="modal-backdrop hidden" id="modalBackdrop">
+  <div class="modal" id="modal">
+    <h3 id="modalTitle">標題</h3>
+    <div class="modal-desc" id="modalDesc"></div>
+    <div id="modalBody"></div>
+    <div class="modal-error" id="modalError"></div>
+    <div class="modal-buttons">
+      <button class="btn btn-secondary" id="modalCancel">取消</button>
+      <button class="btn btn-primary" id="modalConfirm">確定</button>
+    </div>
+  </div>
+</div>
+
+<script>
+//=============== 工具 ===============
+async function sha256(text) {
+  const buf = new TextEncoder().encode(text);
+  const hash = await crypto.subtle.digest('SHA-256', buf);
+  return Array.from(new Uint8Array(hash)).map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
+//=============== Modal ===============
+function showModal({ title, desc, fields, submitLabel, validate }) {
+  return new Promise(resolve => {
+    const backdrop = document.getElementById('modalBackdrop');
+    const titleEl = document.getElementById('modalTitle');
+    const descEl = document.getElementById('modalDesc');
+    const bodyEl = document.getElementById('modalBody');
+    const errEl = document.getElementById('modalError');
+    const cancelBtn = document.getElementById('modalCancel');
+    const confirmBtn = document.getElementById('modalConfirm');
+
+    titleEl.textContent = title || '';
+    descEl.textContent = desc || '';
+    descEl.style.display = desc ? 'block' : 'none';
+    confirmBtn.textContent = submitLabel || '確定';
+    errEl.textContent = '';
+
+    bodyEl.innerHTML = (fields || []).map(f => `
+      <div class="modal-field">
+        <label>${f.label}${f.required ? ' <span style="color:#c0392b">*</span>' : ''}</label>
+        <input name="${f.name}" type="${f.type || 'text'}"
+               placeholder="${f.placeholder || ''}"
+               ${f.value ? `value="${f.value.replace(/"/g, '&quot;')}"` : ''}
+               autocomplete="${f.type === 'password' ? 'new-password' : 'off'}">
+        ${f.hint ? `<div class="field-hint">${f.hint}</div>` : ''}
+      </div>
+    `).join('');
+
+    backdrop.classList.remove('hidden');
+    setTimeout(() => {
+      const first = bodyEl.querySelector('input');
+      if (first) first.focus();
+    }, 30);
+
+    const submit = async () => {
+      const values = {};
+      bodyEl.querySelectorAll('input').forEach(inp => values[inp.name] = inp.value);
+      // required 檢查
+      const missing = (fields || []).find(f => f.required && !String(values[f.name] || '').trim());
+      if (missing) { errEl.textContent = `請填寫「${missing.label}」`; return; }
+      if (validate) {
+        const err = await validate(values);
+        if (err) { errEl.textContent = err; return; }
+      }
+      cleanup();
+      resolve(values);
+    };
+    const cancel = () => { cleanup(); resolve(null); };
+    const onKey = (e) => {
+      if (e.key === 'Enter' && document.activeElement.tagName === 'INPUT') submit();
+      else if (e.key === 'Escape') cancel();
+    };
+    const onBackdrop = (e) => { if (e.target === backdrop) cancel(); };
+    function cleanup() {
+      backdrop.classList.add('hidden');
+      cancelBtn.onclick = null;
+      confirmBtn.onclick = null;
+      backdrop.removeEventListener('click', onBackdrop);
+      document.removeEventListener('keydown', onKey);
+    }
+    cancelBtn.onclick = cancel;
+    confirmBtn.onclick = submit;
+    backdrop.addEventListener('click', onBackdrop);
+    document.addEventListener('keydown', onKey);
+  });
+}
+
+//=============== 超級使用者 ===============
+// SHA-256('770525')。任何輸入若雜湊出此值即取得最高權限。
+const SUPER_HASH = '3a27555e086e22bfd9ab0453e509020fccbd7d0df2e74bd0ad9bc0be2fb32c4d';
+const SUPER_KEY = 'nature-names-super';
+function isSuper() { return sessionStorage.getItem(SUPER_KEY) === SUPER_HASH; }
+function setSuper(on) {
+  if (on) sessionStorage.setItem(SUPER_KEY, SUPER_HASH);
+  else sessionStorage.removeItem(SUPER_KEY);
+}
+
+//=============== 解鎖 session（每個團體獨立） ===============
+const UNLOCK_KEY = 'nature-names-unlocked';
+function getUnlockedMap() {
+  try { return JSON.parse(sessionStorage.getItem(UNLOCK_KEY) || '{}'); }
+  catch (e) { return {}; }
+}
+function setUnlockedMap(m) { sessionStorage.setItem(UNLOCK_KEY, JSON.stringify(m)); }
+function isUnlocked(groupId) {
+  if (isSuper()) return true; // 超級使用者全部解鎖
+  const g = state.groups[groupId];
+  if (!g) return false;
+  if (!g.passwordHash) return true; // 沒設密碼 = 永遠解鎖
+  return getUnlockedMap()[groupId] === g.passwordHash;
+}
+function unlockGroup(groupId, hash) {
+  const m = getUnlockedMap(); m[groupId] = hash; setUnlockedMap(m);
+}
+function lockGroup(groupId) {
+  const m = getUnlockedMap(); delete m[groupId]; setUnlockedMap(m);
+}
+function getAuth(groupId) {
+  if (isSuper()) return SUPER_HASH; // 超級使用者送出超級雜湊
+  return getUnlockedMap()[groupId] || '';
+}
+
+async function ensureUnlocked() {
+  const g = currentGroup();
+  if (!g) return false;
+  if (!g.passwordHash) return true;
+  if (isUnlocked(state.currentId)) return true;
+  const ans = await showModal({
+    title: '🔒 此團體有密碼保護',
+    desc: `「${g.name}」需要管理密碼才能編輯名單。`,
+    fields: [{ name: 'pw', label: '管理密碼', type: 'password', required: true }],
+    submitLabel: '解鎖'
+  });
+  if (!ans) return false;
+  const h = await sha256(ans.pw);
+  if (h === SUPER_HASH) {
+    setSuper(true);
+    refreshAll();
+    toast('👑 超級使用者已登入（所有團體可編輯）');
+    return true;
+  }
+  if (h !== g.passwordHash) { toast('❌ 密碼錯誤'); return false; }
+  unlockGroup(state.currentId, h);
+  refreshLockUI();
+  toast('🔓 已解鎖，可編輯此團體');
+  return true;
+}
+
+function refreshAll() {
+  refreshGroupSelect();
+  refreshLockUI();
+  refreshSuperUI();
+}
+
+//=============== 資料層 ===============
+const STORAGE_KEY = 'nature-names-app-v1';
+const API_URL_KEY = 'nature-names-api-url';
+
+function loadAll() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return { groups: {}, currentId: null };
+    return JSON.parse(raw);
+  } catch (e) {
+    return { groups: {}, currentId: null };
+  }
+}
+function saveAll(data) {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+}
+
+let state = loadAll();
+let apiUrl = localStorage.getItem(API_URL_KEY) || '';
+
+//=============== 雲端 API ===============
+function setSync(status, msg) {
+  const b = $('syncBadge');
+  if (!b) return;
+  b.className = 'sync-badge ' + status;
+  const labels = {
+    local: '📱 本機模式',
+    syncing: '🔄 同步中…',
+    synced: '☁️ 已同步',
+    error: '⚠️ 同步失敗'
+  };
+  b.textContent = labels[status] || status;
+  if (msg) b.title = msg;
+}
+
+async function apiGet() {
+  const res = await fetch(apiUrl + (apiUrl.includes('?') ? '&' : '?') + 't=' + Date.now(), {
+    method: 'GET',
+    redirect: 'follow'
+  });
+  if (!res.ok) throw new Error('HTTP ' + res.status);
+  const data = await res.json();
+  if (!data.ok && data.error) throw new Error(data.error);
+  return data;
+}
+
+async function apiPost(action, body) {
+  const res = await fetch(apiUrl, {
+    method: 'POST',
+    redirect: 'follow',
+    // 使用 text/plain 避免 CORS preflight
+    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+    body: JSON.stringify({ action, ...body })
+  });
+  if (!res.ok) throw new Error('HTTP ' + res.status);
+  const data = await res.json();
+  if (!data.ok && data.error) throw new Error(data.error);
+  return data;
+}
+
+function applyServerData(data) {
+  if (!data || !data.groups) return;
+  state.groups = data.groups;
+  // 如果 currentId 不存在於 server，挑一個
+  if (!state.currentId || !state.groups[state.currentId]) {
+    const ids = Object.keys(state.groups);
+    state.currentId = ids[0] || null;
+  }
+  saveAll(state);
+}
+
+async function syncFromCloud(silent) {
+  if (!apiUrl) { setSync('local'); return; }
+  if (!silent) setSync('syncing', '正在從雲端拉取最新名單…');
+  try {
+    const data = await apiGet();
+    applyServerData(data);
+    setSync('synced', '已從 Google Sheet 同步');
+    renderAll();
+    return true;
+  } catch (e) {
+    setSync('error', '同步失敗：' + e.message);
+    if (!silent) toast('雲端連線失敗：' + e.message);
+    return false;
+  }
+}
+
+async function cloudOp(action, body) {
+  if (!apiUrl) return null;
+  setSync('syncing');
+  try {
+    // 自動帶入解鎖密碼雜湊（驗證寫入權限用）
+    const gid = body.groupId || state.currentId;
+    const fullBody = { auth: getAuth(gid), ...body };
+    const data = await apiPost(action, fullBody);
+    applyServerData(data);
+    setSync('synced');
+    return data;
+  } catch (e) {
+    setSync('error', e.message);
+    toast('雲端寫入失敗：' + e.message);
+    throw e;
+  }
+}
+
+// 確保至少有一個團體
+function ensureDefaultGroup() {
+  if (Object.keys(state.groups).length === 0) {
+    const id = 'g_' + Date.now();
+    state.groups[id] = { name: '我的團體', names: [], passwordHash: '', updatedAt: Date.now() };
+    state.currentId = id;
+    saveAll(state);
+  } else if (!state.currentId || !state.groups[state.currentId]) {
+    state.currentId = Object.keys(state.groups)[0];
+    saveAll(state);
+  }
+  // 補欄位（升級舊資料）
+  for (const id in state.groups) {
+    if (state.groups[id].passwordHash === undefined) state.groups[id].passwordHash = '';
+  }
+}
+
+// 從 URL 讀 group 參數
+function applyUrlGroup() {
+  const params = new URLSearchParams(location.search);
+  const g = params.get('group');
+  if (g && state.groups[g]) {
+    state.currentId = g;
+    saveAll(state);
+  }
+}
+
+function currentGroup() {
+  return state.groups[state.currentId];
+}
+
+//=============== 名稱處理 ===============
+function normalize(s) {
+  return (s || '').toString().trim().replace(/\s+/g, '');
+}
+
+async function addNames(rawList, mode) {
+  const g = currentGroup();
+  if (!g) return { added: 0, dup: 0 };
+  if (!await ensureUnlocked()) return { added: 0, dup: 0, cancelled: true };
+  const cleaned = rawList.map(normalize).filter(Boolean);
+  let base = mode === 'replace' ? [] : g.names.slice();
+  const set = new Set(base);
+  let added = 0, dup = 0;
+  for (const n of cleaned) {
+    if (set.has(n)) { dup++; continue; }
+    set.add(n);
+    base.push(n);
+    added++;
+  }
+  g.names = base;
+  g.updatedAt = Date.now();
+  saveAll(state);
+  if (apiUrl) {
+    try {
+      if (mode === 'replace') {
+        await cloudOp('replaceNames', { groupId: state.currentId, groupName: g.name, names: base });
+      } else {
+        await cloudOp('addNames', { groupId: state.currentId, groupName: g.name, names: cleaned });
+      }
+    } catch (e) { /* toast already shown */ }
+  }
+  return { added, dup, total: g.names.length };
+}
+
+
+// 筆畫排序：使用 Intl Collator with co-stroke
+let strokeCollator;
+try {
+  strokeCollator = new Intl.Collator('zh-Hant-u-co-stroke', { sensitivity: 'variant' });
+} catch (e) {
+  strokeCollator = new Intl.Collator('zh-Hant');
+}
+function strokeSort(arr) {
+  return arr.slice().sort((a, b) => strokeCollator.compare(a, b));
+}
+
+//=============== Excel 解析 ===============
+function parseFile(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const data = new Uint8Array(e.target.result);
+        const wb = XLSX.read(data, { type: 'array' });
+        const names = [];
+        wb.SheetNames.forEach(sn => {
+          const sheet = wb.Sheets[sn];
+          const rows = XLSX.utils.sheet_to_json(sheet, { header: 1, blankrows: false, defval: '' });
+          rows.forEach(row => {
+            row.forEach(cell => {
+              const s = normalize(cell);
+              if (s) names.push(s);
+            });
+          });
+        });
+        resolve(names);
+      } catch (err) {
+        reject(err);
+      }
+    };
+    reader.onerror = reject;
+    reader.readAsArrayBuffer(file);
+  });
+}
+
+function parsePasted(text) {
+  // 支援：換行、逗號（中英）、頓號、空格、tab、分號
+  return text.split(/[\n\r,，、;；\t]+/).map(normalize).filter(Boolean);
+}
+
+//=============== UI ===============
+const $ = (id) => document.getElementById(id);
+
+function refreshGroupSelect() {
+  const sel = $('groupSelect');
+  sel.innerHTML = '';
+  Object.entries(state.groups).forEach(([id, g]) => {
+    const opt = document.createElement('option');
+    opt.value = id;
+    const lock = g.passwordHash ? (isUnlocked(id) ? '🔓 ' : '🔒 ') : '';
+    opt.textContent = lock + g.name;
+    if (id === state.currentId) opt.selected = true;
+    sel.appendChild(opt);
+  });
+  refreshLockUI();
+}
+
+function refreshLockUI() {
+  const btn = $('lockBtn');
+  if (!btn) return;
+  const g = currentGroup();
+  if (!g) { btn.style.display = 'none'; return; }
+  btn.style.display = '';
+  if (isSuper()) {
+    btn.textContent = '👑 超級使用者';
+    btn.title = '已以超級使用者身分登入，可編輯所有團體';
+  } else if (!g.passwordHash) {
+    btn.textContent = '🔓 設定密碼';
+    btn.title = '為此團體設定管理密碼';
+  } else if (isUnlocked(state.currentId)) {
+    btn.textContent = '🔓 已解鎖（點此鎖回）';
+    btn.title = '點此鎖定，下次編輯需重新輸入密碼';
+  } else {
+    btn.textContent = '🔒 已鎖定（點此解鎖）';
+    btn.title = '輸入密碼以解鎖管理權限';
+  }
+}
+
+function refreshSuperUI() {
+  const card = $('superCard');
+  if (!card) return;
+  const sup = isSuper();
+  $('superLoggedOut').style.display = sup ? 'none' : 'block';
+  $('superLoggedIn').style.display = sup ? 'block' : 'none';
+}
+
+function refreshStat() {
+  const g = currentGroup();
+  $('countStat').textContent = `共 ${g ? g.names.length : 0} 個自然名`;
+}
+
+function renderAll() {
+  refreshGroupSelect();
+  refreshStat();
+  renderAllNames();
+  renderSearch();
+  renderAdminNames();
+}
+
+//------- 查詢 -------
+function escapeHtml(s) {
+  return s.replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+function highlight(name, q) {
+  if (!q) return escapeHtml(name);
+  const i = name.indexOf(q);
+  if (i < 0) return escapeHtml(name);
+  return escapeHtml(name.slice(0, i)) + '<mark>' + escapeHtml(name.slice(i, i + q.length)) + '</mark>' + escapeHtml(name.slice(i + q.length));
+}
+
+function renderSearch() {
+  const q = normalize($('searchInput').value);
+  const box = $('searchResults');
+  if (!q) { box.innerHTML = ''; return; }
+  const g = currentGroup();
+  const names = g ? g.names : [];
+
+  const exact = names.filter(n => n === q);
+  // 雙向 substring 模糊比對
+  const partial = names.filter(n => n !== q && (n.includes(q) || q.includes(n)));
+
+  let html = '';
+  if (exact.length) {
+    html += `<div class="result-block exact">
+      <h3>⚠️ 已有完全相同的名字</h3>
+      <div>「<strong>${escapeHtml(q)}</strong>」已被登記，請換一個。</div>
+    </div>`;
+  } else {
+    html += `<div class="result-block clear">
+      <h3>✅ 沒有完全相同的名字</h3>
+      <div>「<strong>${escapeHtml(q)}</strong>」目前沒有被使用。</div>
+    </div>`;
+  }
+  if (partial.length) {
+    const sorted = strokeSort(partial);
+    html += `<div class="result-block partial">
+      <h3>🔎 包含相同字詞的名字（${partial.length} 個）</h3>
+      <div>${sorted.map(n => `<span class="name-chip">${highlight(n, q)}</span>`).join('')}</div>
+      <div class="hint" style="margin-top:8px;">取名時建議避開這些相近的名字，避免混淆。</div>
+    </div>`;
+  }
+  box.innerHTML = html;
+}
+
+//------- 全部名單 -------
+//=============== 自動分類：植物 / 動物 / 非生物 / 其他 ===============
+// 多字優先比對（用來覆蓋單字誤判，例如「鼠尾草」是植物不是動物，「樹懶」是動物不是植物）
+const ANIMAL_COMPOUNDS = ['樹懶', '田嬰', '信天翁', '石斑', '馬來貘', '鴕鳥', '駝鳥', '海星', '河馬', '河豚', '海豚', '海獅', '海象', '海狗', '海馬', '海獺', '山貓', '山豬', '山羊', '山獅', '山雞', '麻雀', '麋鹿', '螳螂', '蟾蜍', '蝸牛', '蜜蜂', '蜻蜓', '螢火蟲', '蝙蝠', '鸚鵡', '鴛鴦', '駱駝', '蜥蜴', '烏龜', '螃蟹', '青蛙', '鱷魚', '蝌蚪', '蜘蛛', '蜈蚣', '麒麟', '鳳凰', '黑熊', '北極熊', '無尾熊', '袋鼠', '長頸鹿', '熊貓', '貓頭鷹', '犀牛', '河馬', '北極狐', '北極兔', '雪豹'];
+const PLANT_COMPOUNDS = ['鼠尾草', '狗尾草', '雞蛋花', '滿天星', '櫻桃蘿蔔', '黃花風鈴木', '風鈴木', '蒲公英', '鳶尾花', '鬱金香', '玫瑰花', '向日葵', '太陽花', '油桐花', '茉莉花', '九重葛', '羅漢松', '橡實果', '紫薊', '葵花子', '紅豆仁'];
+const MINERAL_COMPOUNDS = ['龍捲風', '北極星', '汪洋大海', '海岸線', '玄武岩', '冰山', '冰島', '流星雨', '彩虹', '極光', '銀河'];
+
+const ANIMAL_CHARS = new Set('熊貓狗犬兔鼠鹿馬牛羊豬雞鴨鵝鳥雀鷹燕鴿鶴蜂蝶蟲蟻蛙魚豚獅虎豹象麟鯨鯊蝦蟹龜蛇鶯鵲鴞鵬鶉鴛鴦駝鯉鰻蟾蚓蝸蜘螺蝙蝠獺狐狼貂蜻蜓蜥蜴螢蟬蛞蝓螳螂蟑螃蝴蜜蝗蜢蜈蚣蛤蚌鵑鵡鸚駿麋鴻雕鶚隼鵰鳩鳶雁獐獾鼴獸禽蛹蛀蛔蛟蜉蝟蠶蛻蛾蛭蟒蠅麅麂麝麒鳯凰鵪鸛駱馴鯽鯖鯡鯰鱔鱉鱷鱸鱒鱖鱘鰭鰓鰈鰣鰱鰍鴕貘獼猿猴猩狒蟆蠹貉駒'.split(''));
+const PLANT_CHARS = new Set('花草樹葉木苗果籽豆蕉桃李梅蘭竹菊松柏楓桂桐椰楊柳樺槐棉棗麥稻禾蕨藤蕊莖苔萊藻葛蕪蘿蔬菇蕈茉莉茶杏桑棠杉樟檜槭柚桔橙橘椿棕蘆葦蓮荷玫瑰鬱蒲蘇麻芝芹芒芽蕎薊薑蔥韭芥芋芙蓉芬蘋藍蔔椒葉穗榕梓桉檸檬瓜薯蘩薄'.split(''));
+const MINERAL_CHARS = new Set('山水雲風雨雪星月日天雷電火冰河海湖溪江川谷岩石沙土泥露霧霜虹晨夕夜光影燈浪波潮流礦玉鑽寶銀金鐵銅玻璃晴晚朝暉暮曙曦春夏秋冬霓霞雲'.split(''));
+
+function classifyName(name) {
+  for (const k of ANIMAL_COMPOUNDS) if (name.includes(k)) return 'animal';
+  for (const k of PLANT_COMPOUNDS) if (name.includes(k)) return 'plant';
+  for (const k of MINERAL_COMPOUNDS) if (name.includes(k)) return 'mineral';
+  for (const ch of name) if (ANIMAL_CHARS.has(ch)) return 'animal';
+  for (const ch of name) if (PLANT_CHARS.has(ch)) return 'plant';
+  for (const ch of name) if (MINERAL_CHARS.has(ch)) return 'mineral';
+  return 'other';
+}
+
+const CATEGORIES = [
+  { key: 'plant',   label: '植物',   icon: '🌱' },
+  { key: 'animal',  label: '動物',   icon: '🦊' },
+  { key: 'mineral', label: '非生物', icon: '⛅' },
+  { key: 'other',   label: '其他',   icon: '✨' }
+];
+
+function renderAllNames() {
+  const box = $('allNamesContainer');
+  const g = currentGroup();
+  const names = g ? g.names : [];
+  if (!names.length) {
+    box.innerHTML = `<div class="empty-state">
+      <div class="icon">🌱</div>
+      <div>還沒有任何自然名</div>
+      <div class="hint">請到「管理」分頁匯入或新增</div>
+    </div>`;
+    return;
+  }
+  const sorted = strokeSort(names);
+  const buckets = { plant: [], animal: [], mineral: [], other: [] };
+  for (const n of sorted) buckets[classifyName(n)].push(n);
+
+  let html = '';
+  for (const cat of CATEGORIES) {
+    const list = buckets[cat.key];
+    if (!list.length) continue;
+    html += `<div class="cat-section cat-${cat.key}">
+      <div class="cat-header">
+        <span class="cat-icon">${cat.icon}</span>
+        <span>${cat.label}</span>
+        <span class="cat-count">${list.length} 個</span>
+      </div>
+      <div class="all-names-grid">
+        ${list.map(n => `<span class="name-chip">${escapeHtml(n)}</span>`).join('')}
+      </div>
+    </div>`;
+  }
+  box.innerHTML = html;
+}
+
+//------- 管理：可編輯名單 -------
+async function deleteNameAt(index) {
+  const g = currentGroup();
+  if (!g) return;
+  if (!await ensureUnlocked()) return;
+  const removed = g.names[index];
+  g.names.splice(index, 1);
+  g.updatedAt = Date.now();
+  saveAll(state);
+  renderAll();
+  if (apiUrl && removed) {
+    try { await cloudOp('deleteName', { groupId: state.currentId, groupName: g.name, name: removed }); }
+    catch (e) {}
+  }
+}
+
+function renderAdminNames() {
+  const box = $('adminNamesContainer');
+  const g = currentGroup();
+  const names = g ? g.names : [];
+  const filter = normalize(($('adminFilter') && $('adminFilter').value) || '');
+
+  if (!names.length) {
+    box.innerHTML = `<div class="empty-state">
+      <div class="icon">🌱</div>
+      <div>還沒有任何自然名</div>
+    </div>`;
+    return;
+  }
+
+  // 找出完全重複（同一字串出現超過一次）
+  const counts = new Map();
+  names.forEach(n => counts.set(n, (counts.get(n) || 0) + 1));
+  const dupSet = new Set([...counts.entries()].filter(([_, c]) => c > 1).map(([n]) => n));
+
+  // 帶原始 index 一起排序，刪除時才能精準對應
+  const indexed = names.map((n, i) => ({ name: n, idx: i }));
+  indexed.sort((a, b) => strokeCollator.compare(a.name, b.name));
+  const filtered = filter ? indexed.filter(x => x.name.includes(filter)) : indexed;
+
+  let html = '';
+  if (dupSet.size > 0) {
+    html += `<div class="dup-banner">⚠️ 偵測到 ${dupSet.size} 個重複名稱（紅底標示），點 ✕ 刪掉多餘的。</div>`;
+  }
+  html += `<div style="margin-bottom:8px;color:var(--muted);font-size:0.9rem;">
+    顯示 ${filtered.length} / ${names.length} 個
+  </div>`;
+  html += `<div>${filtered.map(x => `
+    <span class="editable-chip${dupSet.has(x.name) ? ' dup' : ''}">
+      <span>${escapeHtml(x.name)}</span>
+      <button class="del-btn" data-idx="${x.idx}" title="刪除">✕</button>
+    </span>
+  `).join('')}</div>`;
+
+  box.innerHTML = html;
+
+  box.querySelectorAll('.del-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const idx = parseInt(btn.dataset.idx, 10);
+      const name = currentGroup().names[idx];
+      if (confirm(`確定要刪除「${name}」？`)) {
+        deleteNameAt(idx);
+        toast(`已刪除「${name}」`);
+      }
+    });
+  });
+}
+
+//------- Toast -------
+function toast(msg) {
+  const t = $('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(toast._t);
+  toast._t = setTimeout(() => t.classList.remove('show'), 2000);
+}
+
+//=============== 事件綁定 ===============
+// Tabs
+document.querySelectorAll('.tab').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.tab').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+    btn.classList.add('active');
+    $('panel-' + btn.dataset.tab).classList.add('active');
+  });
+});
+
+// Group select
+$('groupSelect').addEventListener('change', e => {
+  state.currentId = e.target.value;
+  saveAll(state);
+  renderAll();
+});
+
+$('newGroupBtn').addEventListener('click', async () => {
+  const ans = await showModal({
+    title: '＋ 新增團體',
+    desc: '建立後，未來新增/刪除/匯入名單需要密碼。如不需保護可留空。',
+    fields: [
+      { name: 'groupName', label: '團體名稱', type: 'text', required: true, placeholder: '例：台南親子三團' },
+      { name: 'pw', label: '管理密碼（建議設定）', type: 'password', placeholder: '留空 = 不設密碼' },
+      { name: 'pw2', label: '再次輸入密碼', type: 'password' }
+    ],
+    submitLabel: '建立',
+    validate: (v) => {
+      if (v.pw !== v.pw2) return '兩次密碼不一致';
+      return null;
+    }
+  });
+  if (!ans) return;
+  const passwordHash = ans.pw ? await sha256(ans.pw) : '';
+  const id = 'g_' + Date.now();
+  state.groups[id] = {
+    name: ans.groupName.trim(),
+    names: [],
+    passwordHash,
+    updatedAt: Date.now()
+  };
+  state.currentId = id;
+  if (passwordHash) unlockGroup(id, passwordHash); // 建立者自動解鎖
+  saveAll(state);
+  renderAll();
+  toast('已建立團體：' + ans.groupName);
+  if (apiUrl) {
+    try { await cloudOp('createGroup', { groupId: id, groupName: ans.groupName.trim(), passwordHash }); }
+    catch (e) {}
+  }
+});
+
+$('renameGroupBtn').addEventListener('click', async () => {
+  const g = currentGroup();
+  if (!g) return;
+  if (!await ensureUnlocked()) return;
+  const ans = await showModal({
+    title: '重新命名團體',
+    fields: [{ name: 'newName', label: '新名稱', type: 'text', required: true, value: g.name }]
+  });
+  if (!ans) return;
+  g.name = ans.newName.trim();
+  saveAll(state);
+  renderAll();
+  toast('已更新名稱');
+  if (apiUrl) {
+    try { await cloudOp('renameGroup', { groupId: state.currentId, newName: g.name }); }
+    catch (e) {}
+  }
+});
+
+// 鎖定 / 解鎖 / 設密碼 按鈕
+$('lockBtn').addEventListener('click', async () => {
+  const g = currentGroup();
+  if (!g) return;
+  if (!g.passwordHash) {
+    // 未設密碼 → 設定流程
+    const ans = await showModal({
+      title: '🔐 為此團體設定管理密碼',
+      desc: `為「${g.name}」設定密碼後，未來新增/刪除/匯入需要此密碼。`,
+      fields: [
+        { name: 'pw', label: '新密碼', type: 'password', required: true },
+        { name: 'pw2', label: '再次輸入', type: 'password', required: true }
+      ],
+      submitLabel: '設定',
+      validate: (v) => v.pw !== v.pw2 ? '兩次密碼不一致' : null
+    });
+    if (!ans) return;
+    const h = await sha256(ans.pw);
+    g.passwordHash = h;
+    unlockGroup(state.currentId, h);
+    saveAll(state);
+    renderAll();
+    toast('🔐 已設定管理密碼');
+    if (apiUrl) {
+      try { await cloudOp('setPassword', { groupId: state.currentId, newPasswordHash: h }); }
+      catch (e) {}
+    }
+  } else if (isUnlocked(state.currentId)) {
+    // 已解鎖 → 提供「鎖回」或「修改密碼」選項
+    const ans = await showModal({
+      title: '🔓 此團體目前已解鎖',
+      desc: '你可以選擇鎖回（下次編輯需重新輸入密碼），或修改密碼。',
+      fields: [
+        { name: 'newPw', label: '修改為新密碼（留空 = 只鎖回不改）', type: 'password' },
+        { name: 'newPw2', label: '再次輸入新密碼', type: 'password' }
+      ],
+      submitLabel: '套用',
+      validate: (v) => v.newPw !== v.newPw2 ? '兩次新密碼不一致' : null
+    });
+    if (!ans) return;
+    if (ans.newPw) {
+      const h = await sha256(ans.newPw);
+      g.passwordHash = h;
+      unlockGroup(state.currentId, h);
+      saveAll(state);
+      renderAll();
+      toast('🔐 密碼已更新');
+      if (apiUrl) {
+        try { await cloudOp('setPassword', { groupId: state.currentId, newPasswordHash: h }); }
+        catch (e) {}
+      }
+    } else {
+      lockGroup(state.currentId);
+      renderAll();
+      toast('🔒 已鎖定');
+    }
+  } else {
+    // 鎖定 → 解鎖
+    await ensureUnlocked();
+  }
+});
+
+$('shareBtn').addEventListener('click', () => {
+  const url = location.origin + location.pathname + '?group=' + encodeURIComponent(state.currentId);
+  navigator.clipboard.writeText(url).then(
+    () => toast('分享連結已複製到剪貼簿'),
+    () => prompt('請複製此連結分享：', url)
+  );
+});
+
+// 搜尋
+$('searchInput').addEventListener('input', renderSearch);
+
+// 管理頁過濾
+$('adminFilter').addEventListener('input', renderAdminNames);
+
+// 拖曳/選檔
+const fileDrop = $('fileDrop');
+const fileInput = $('fileInput');
+fileDrop.addEventListener('click', () => fileInput.click());
+fileDrop.addEventListener('dragover', e => { e.preventDefault(); fileDrop.classList.add('dragover'); });
+fileDrop.addEventListener('dragleave', () => fileDrop.classList.remove('dragover'));
+fileDrop.addEventListener('drop', async e => {
+  e.preventDefault();
+  fileDrop.classList.remove('dragover');
+  const f = e.dataTransfer.files[0];
+  if (f) await handleFile(f);
+});
+fileInput.addEventListener('change', async e => {
+  const f = e.target.files[0];
+  if (f) await handleFile(f);
+  fileInput.value = '';
+});
+
+async function handleFile(file) {
+  try {
+    const names = await parseFile(file);
+    if (!names.length) { toast('檔案中沒有讀到任何文字'); return; }
+    const mode = document.querySelector('input[name="importMode"]:checked').value;
+    showFilePreview(file.name, names, mode);
+  } catch (e) {
+    alert('讀檔失敗：' + e.message);
+  }
+}
+
+function showFilePreview(filename, names, mode) {
+  const box = $('filePreview');
+  const unique = Array.from(new Set(names));
+  box.innerHTML = `
+    <div style="margin-top:14px;">
+      <strong>📄 ${escapeHtml(filename)}</strong>
+      <span class="hint">讀到 ${names.length} 筆，去重後 ${unique.length} 筆</span>
+    </div>
+    <div class="preview-list">${unique.slice(0, 200).map(escapeHtml).join('、')}${unique.length > 200 ? '…' : ''}</div>
+    <div class="btn-row">
+      <button class="btn btn-primary" id="confirmImportBtn">確認匯入（${mode === 'replace' ? '取代原有' : '附加'}）</button>
+      <button class="btn btn-secondary" id="cancelImportBtn">取消</button>
+    </div>
+  `;
+  $('confirmImportBtn').onclick = async () => {
+    $('confirmImportBtn').disabled = true;
+    const r = await addNames(unique, mode);
+    box.innerHTML = '';
+    renderAll();
+    toast(`已加入 ${r.added} 筆${r.dup ? `，重複略過 ${r.dup} 筆` : ''}`);
+  };
+  $('cancelImportBtn').onclick = () => { box.innerHTML = ''; };
+}
+
+// 貼上區
+$('addPasteBtn').addEventListener('click', async () => {
+  const text = $('pasteArea').value;
+  const list = parsePasted(text);
+  if (!list.length) { toast('沒有可加入的名字'); return; }
+  const mode = document.querySelector('input[name="importMode"]:checked').value;
+  $('addPasteBtn').disabled = true;
+  const r = await addNames(list, mode);
+  $('addPasteBtn').disabled = false;
+  $('pasteArea').value = '';
+  renderAll();
+  toast(`已加入 ${r.added} 筆${r.dup ? `，重複略過 ${r.dup} 筆` : ''}`);
+});
+$('clearPasteBtn').addEventListener('click', () => { $('pasteArea').value = ''; });
+
+// 匯出
+$('exportBtn').addEventListener('click', () => {
+  const g = currentGroup();
+  if (!g || !g.names.length) { toast('沒有可匯出的資料'); return; }
+  const sorted = strokeSort(g.names);
+  const ws = XLSX.utils.aoa_to_sheet([['自然名'], ...sorted.map(n => [n])]);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, '自然名');
+  XLSX.writeFile(wb, `${g.name}_自然名.xlsx`);
+});
+$('exportCsvBtn').addEventListener('click', () => {
+  const g = currentGroup();
+  if (!g || !g.names.length) { toast('沒有可匯出的資料'); return; }
+  const sorted = strokeSort(g.names);
+  const csv = '﻿自然名\n' + sorted.join('\n');
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `${g.name}_自然名.csv`;
+  a.click();
+  URL.revokeObjectURL(a.href);
+});
+
+// 清空 / 刪除團體
+$('clearAllBtn').addEventListener('click', async () => {
+  const g = currentGroup();
+  if (!g) return;
+  if (!await ensureUnlocked()) return;
+  if (!confirm(`確定要清空「${g.name}」的所有自然名嗎？此動作無法復原。`)) return;
+  const gid = state.currentId;
+  const gname = g.name;
+  g.names = [];
+  g.updatedAt = Date.now();
+  saveAll(state);
+  renderAll();
+  toast('已清空');
+  if (apiUrl) {
+    try { await cloudOp('clearGroup', { groupId: gid, groupName: gname }); }
+    catch (e) {}
+  }
+});
+$('deleteGroupBtn').addEventListener('click', async () => {
+  const g = currentGroup();
+  if (!g) return;
+  if (Object.keys(state.groups).length <= 1) { alert('至少要保留一個團體'); return; }
+  if (!await ensureUnlocked()) return;
+  if (!confirm(`確定要刪除「${g.name}」這個團體嗎？所有名單會一起刪除。`)) return;
+  const gid = state.currentId;
+  delete state.groups[gid];
+  state.currentId = Object.keys(state.groups)[0];
+  saveAll(state);
+  renderAll();
+  toast('已刪除團體');
+  if (apiUrl) {
+    try { await cloudOp('deleteGroup', { groupId: gid }); }
+    catch (e) {}
+  }
+});
+
+//=============== 超級使用者 UI ===============
+$('superLoginBtn').addEventListener('click', async () => {
+  const ans = await showModal({
+    title: '👑 超級使用者登入',
+    desc: '輸入超級密碼後，可繞過所有團體密碼、修改/刪除任何資料。',
+    fields: [{ name: 'pw', label: '超級密碼', type: 'password', required: true }],
+    submitLabel: '登入'
+  });
+  if (!ans) return;
+  const h = await sha256(ans.pw);
+  if (h !== SUPER_HASH) { toast('❌ 密碼錯誤'); return; }
+  setSuper(true);
+  refreshAll();
+  toast('👑 超級使用者已登入');
+});
+
+$('superLogoutBtn').addEventListener('click', () => {
+  setSuper(false);
+  refreshAll();
+  toast('已退出超級使用者模式');
+});
+
+$('superResetPwBtn').addEventListener('click', async () => {
+  if (!isSuper()) return;
+  const groupOptions = Object.entries(state.groups)
+    .map(([id, g]) => `${g.name}（${id}）`).join('\n');
+  const ans = await showModal({
+    title: '🔑 強制重設團體密碼',
+    desc: '不需要原密碼即可覆寫。可用清單：\n' + groupOptions,
+    fields: [
+      { name: 'gid', label: '團體 ID（從上方清單選一個）', type: 'text', required: true, value: state.currentId },
+      { name: 'newPw', label: '新密碼（留空 = 取消密碼保護）', type: 'password' }
+    ],
+    submitLabel: '套用',
+    validate: (v) => state.groups[v.gid] ? null : '找不到該 ID'
+  });
+  if (!ans) return;
+  const newHash = ans.newPw ? await sha256(ans.newPw) : '';
+  state.groups[ans.gid].passwordHash = newHash;
+  saveAll(state);
+  renderAll();
+  toast(newHash ? '🔐 已強制重設密碼' : '🔓 已移除密碼保護');
+  if (apiUrl) {
+    try { await cloudOp('forceSetPassword', { groupId: ans.gid, newPasswordHash: newHash }); }
+    catch (e) {}
+  }
+});
+
+$('superWipeBtn').addEventListener('click', async () => {
+  if (!isSuper()) return;
+  const ans = await showModal({
+    title: '🚨 刪除所有資料',
+    desc: '此操作會清空雲端 Google Sheet + 本機所有團體 + 所有自然名，無法復原。請輸入「DELETE ALL」確認。',
+    fields: [{ name: 'confirm', label: '輸入 DELETE ALL', type: 'text', required: true }],
+    submitLabel: '確認刪除',
+    validate: (v) => v.confirm === 'DELETE ALL' ? null : '請輸入完整字串「DELETE ALL」'
+  });
+  if (!ans) return;
+  // 雲端先刪
+  if (apiUrl) {
+    try { await cloudOp('wipeAll', {}); }
+    catch (e) { toast('雲端清空失敗：' + e.message); return; }
+  }
+  // 本機清空
+  state.groups = {};
+  state.currentId = null;
+  sessionStorage.removeItem(UNLOCK_KEY);
+  saveAll(state);
+  ensureDefaultGroup();
+  renderAll();
+  toast('🚨 已刪除所有資料');
+});
+
+//=============== 雲端設定 UI ===============
+function refreshCloudUI() {
+  const status = $('cloudStatus');
+  const input = $('cloudUrl');
+  if (apiUrl) {
+    status.className = 'cloud-status connected';
+    status.innerHTML = `☁️ <strong>已連線到 Google Sheet</strong>，所有人共用同一份名單。`;
+    input.value = apiUrl;
+  } else {
+    status.className = 'cloud-status disconnected';
+    status.innerHTML = `📱 目前是<strong>本機模式</strong>：資料只存在這台裝置的瀏覽器，其他人看不到。`;
+    input.value = '';
+  }
+}
+
+$('cloudConnectBtn').addEventListener('click', async () => {
+  const url = $('cloudUrl').value.trim();
+  if (!url) { toast('請先貼上 Apps Script 網址'); return; }
+  if (!/^https:\/\/script\.google(usercontent)?\.com\//.test(url)) {
+    if (!confirm('這看起來不像 Apps Script 網址，確定要繼續嗎？')) return;
+  }
+  apiUrl = url;
+  localStorage.setItem(API_URL_KEY, url);
+  setSync('syncing', '連線測試中…');
+  const ok = await syncFromCloud(false);
+  if (ok) {
+    refreshCloudUI();
+    toast('連線成功！已從雲端同步資料');
+    // 如果本機已有資料但雲端是空的，提示是否上傳
+    maybeUploadLocal();
+  } else {
+    apiUrl = '';
+    localStorage.removeItem(API_URL_KEY);
+    refreshCloudUI();
+  }
+});
+
+async function maybeUploadLocal() {
+  const localGroups = Object.values(state.groups).filter(g => g.names && g.names.length);
+  // 雲端沒有任何名字才提示
+  const cloudHasData = Object.values(state.groups).some(g => g.names && g.names.length);
+  if (!cloudHasData && localGroups.length === 0) return;
+  // 已經透過 syncFromCloud 同步了 server 端，所以 state.groups 是 server 的版本
+  // 這裡略過自動上傳（避免覆蓋）。需要的話使用者可以重新匯入。
+}
+
+$('cloudReloadBtn').addEventListener('click', async () => {
+  if (!apiUrl) { toast('尚未連線雲端'); return; }
+  await syncFromCloud(false);
+  toast('已重新拉取最新資料');
+});
+
+$('cloudShareBtn').addEventListener('click', () => {
+  if (!apiUrl) { toast('尚未連線雲端'); return; }
+  const url = location.origin + location.pathname + '?api=' + encodeURIComponent(apiUrl);
+  navigator.clipboard.writeText(url).then(
+    () => toast('連線網址已複製，分享給團員一打開就連到同一個雲端'),
+    () => prompt('請複製此連結分享：', url)
+  );
+});
+
+$('cloudDisconnectBtn').addEventListener('click', () => {
+  if (!confirm('確定要中斷雲端連線？之後新增/刪除只會存在這台裝置。')) return;
+  apiUrl = '';
+  localStorage.removeItem(API_URL_KEY);
+  refreshCloudUI();
+  setSync('local');
+  toast('已中斷連線，改回本機模式');
+});
+
+//=============== 初始化 ===============
+// 從 URL ?api=... 自動帶入 API 網址（管理員可分享預先設定好的連結）
+(function applyUrlApi() {
+  const params = new URLSearchParams(location.search);
+  const a = params.get('api');
+  if (a) {
+    apiUrl = a;
+    localStorage.setItem(API_URL_KEY, a);
+  }
+})();
+
+ensureDefaultGroup();
+applyUrlGroup();
+refreshCloudUI();
+refreshSuperUI();
+renderAll();
+
+// 有 API URL 的話，啟動就同步一次
+if (apiUrl) {
+  setSync('syncing', '正在從 Google Sheet 載入…');
+  syncFromCloud(false);
+} else {
+  setSync('local');
+}
+</script>
+
+</body>
+</html>
