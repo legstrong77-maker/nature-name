@@ -503,7 +503,7 @@
 <body>
 
 <header>
-  <h1>🌿 荒野親子團 自然名查詢系統 <span class="sync-badge local" id="syncBadge" title="目前模式">📱 本機模式</span></h1>
+  <h1>🌿 荒野親子團 自然名查詢系統 <span class="sync-badge syncing" id="syncBadge" title="目前模式">🔄 連線中…</span></h1>
   <div class="subtitle">為各團管理自然名清單，避免命名重複</div>
 </header>
 
@@ -547,14 +547,14 @@
   <div class="panel" id="panel-admin">
     <div class="card cloud-card">
       <h2>☁️ 雲端同步設定（Google Sheet）</h2>
-      <div id="cloudStatus" class="cloud-status disconnected">📱 目前是本機模式：資料只存在這台裝置的瀏覽器，其他人看不到。</div>
-      <div class="hint" style="margin-bottom:8px;">設定後，所有團員打開網站都能看到同一份名單。詳細部署步驟請見 <code>apps-script.gs</code> 檔案最上方說明。</div>
-      <input type="text" class="cloud-input" id="cloudUrl" placeholder="貼上 Google Apps Script 部署網址（https://script.google.com/macros/s/.../exec）">
+      <div id="cloudStatus" class="cloud-status connected">☁️ 連線中…</div>
+      <div class="hint" style="margin-bottom:8px;">本網站所有團員共用同一份 Google Sheet 名單。一般使用者不需要修改下列網址。</div>
+      <input type="text" class="cloud-input" id="cloudUrl" placeholder="Google Apps Script 部署網址">
       <div class="btn-row">
-        <button class="btn btn-primary" id="cloudConnectBtn">連線並同步</button>
+        <button class="btn btn-primary" id="cloudConnectBtn">套用此網址並同步</button>
         <button class="btn btn-secondary" id="cloudReloadBtn">🔄 重新拉取資料</button>
-        <button class="btn btn-secondary" id="cloudShareBtn">📋 複製連線網址</button>
-        <button class="btn btn-danger" id="cloudDisconnectBtn">中斷連線（改回本機）</button>
+        <button class="btn btn-secondary" id="cloudShareBtn">📋 複製分享網址</button>
+        <button class="btn btn-danger" id="cloudDisconnectBtn">中斷連線（改用離線模式）</button>
       </div>
     </div>
 
@@ -779,6 +779,8 @@ function refreshAll() {
 //=============== 資料層 ===============
 const STORAGE_KEY = 'nature-names-app-v1';
 const API_URL_KEY = 'nature-names-api-url';
+// 預設雲端後端：所有人開啟網頁都直接連到同一份 Google Sheet
+const DEFAULT_API_URL = 'https://script.google.com/macros/s/AKfycbw79B6FrG7eEi5TqPZgBi5s0028cMQKnnHyZ7xCZLGgQsZkGjd68co9Iy9RHpfU1wsl/exec';
 
 function loadAll() {
   try {
@@ -794,7 +796,14 @@ function saveAll(data) {
 }
 
 let state = loadAll();
-let apiUrl = localStorage.getItem(API_URL_KEY) || '';
+// 優先順序：使用者本機設定 > 程式碼預設後端
+// 特殊值 '__DISCONNECTED__' 代表使用者明確選擇離線
+const DISCONNECTED_MARKER = '__DISCONNECTED__';
+let apiUrl = (() => {
+  const stored = localStorage.getItem(API_URL_KEY);
+  if (stored === DISCONNECTED_MARKER) return '';
+  return stored || DEFAULT_API_URL || '';
+})();
 
 //=============== 雲端 API ===============
 function setSync(status, msg) {
@@ -802,7 +811,7 @@ function setSync(status, msg) {
   if (!b) return;
   b.className = 'sync-badge ' + status;
   const labels = {
-    local: '📱 本機模式',
+    local: '📱 離線中（雲端中斷）',
     syncing: '🔄 同步中…',
     synced: '☁️ 已同步',
     error: '⚠️ 同步失敗'
@@ -838,6 +847,10 @@ async function apiPost(action, body) {
 
 function applyServerData(data) {
   if (!data || !data.groups) return;
+  // 伺服器空 → 保留本機（讓使用者剛建立的團體可以接著上傳）
+  if (Object.keys(data.groups).length === 0) {
+    return;
+  }
   state.groups = data.groups;
   // 如果 currentId 不存在於 server，挑一個
   if (!state.currentId || !state.groups[state.currentId]) {
@@ -1589,11 +1602,11 @@ function refreshCloudUI() {
   const input = $('cloudUrl');
   if (apiUrl) {
     status.className = 'cloud-status connected';
-    status.innerHTML = `☁️ <strong>已連線到 Google Sheet</strong>，所有人共用同一份名單。`;
+    status.innerHTML = `☁️ <strong>已連線 Google Sheet</strong>，所有人共用同一份名單。`;
     input.value = apiUrl;
   } else {
     status.className = 'cloud-status disconnected';
-    status.innerHTML = `📱 目前是<strong>本機模式</strong>：資料只存在這台裝置的瀏覽器，其他人看不到。`;
+    status.innerHTML = `📱 <strong>離線模式</strong>：資料只存在這台裝置的瀏覽器，其他人看不到。請貼上後端網址或重新整理頁面。`;
     input.value = '';
   }
 }
@@ -1645,12 +1658,12 @@ $('cloudShareBtn').addEventListener('click', () => {
 });
 
 $('cloudDisconnectBtn').addEventListener('click', () => {
-  if (!confirm('確定要中斷雲端連線？之後新增/刪除只會存在這台裝置。')) return;
+  if (!confirm('確定要中斷雲端連線？之後新增/刪除只會存在這台裝置（重新整理頁面也不會自動連回雲端）。')) return;
   apiUrl = '';
-  localStorage.removeItem(API_URL_KEY);
+  localStorage.setItem(API_URL_KEY, DISCONNECTED_MARKER);
   refreshCloudUI();
   setSync('local');
-  toast('已中斷連線，改回本機模式');
+  toast('已中斷連線');
 });
 
 //=============== 初始化 ===============
